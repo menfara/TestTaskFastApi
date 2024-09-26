@@ -1,0 +1,42 @@
+version: '3.7'
+
+services:
+  postgres:
+    container_name: POSTGRES
+    image: postgres:14
+    restart: on-failure
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "log_statement=ddl"]
+    ports:
+      - '5432'
+    volumes:
+      - ./pg_data:/var/lib/postgresql/data:z
+    env_file:
+      - .env
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  migrations:
+    container_name: MIGRATIONS
+    command: alembic upgrade head
+    build: .
+    restart: 'no'
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+  service:
+    container_name: SERVICE
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: on-failure
+    build: .
+    volumes:
+      - .:/src/
+    ports:
+      - '${SERVICE_PORT}:8000'
+    env_file:
+      - .env
+    depends_on:
+      - migrations
+      - postgres
